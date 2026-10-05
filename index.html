@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CS300 Midterm Reviewer</title>
+<meta name="description" content="Notes, flashcards, practice quiz, and outline checklist for CS300 Midterm 1.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<!-- BODY:START -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-code">CS300</span>
+      <span class="brand-name">Midterm 1 Reviewer</span>
+    </div>
+    <div class="chips" aria-label="Your progress">
+      <button class="chip" type="button" id="chip-cards" data-tab="cards">Cards known <b>0/60</b></button>
+      <button class="chip" type="button" id="chip-outline" data-tab="outline">Outline <b>0/11</b></button>
+      <button class="chip" type="button" id="chip-quiz" data-tab="quiz">Last quiz <b>&mdash;</b></button>
+    </div>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Study modes">
+      <button class="tab" type="button" role="tab" id="tab-notes" data-tab="notes" aria-controls="panel-notes" aria-selected="true">Notes</button>
+      <button class="tab" type="button" role="tab" id="tab-cards" data-tab="cards" aria-controls="panel-cards" aria-selected="false">Flashcards<span class="count">60</span></button>
+      <button class="tab" type="button" role="tab" id="tab-quiz" data-tab="quiz" aria-controls="panel-quiz" aria-selected="false">Quiz<span class="count"></span></button>
+      <button class="tab" type="button" role="tab" id="tab-outline" data-tab="outline" aria-controls="panel-outline" aria-selected="false">Outline</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- Notes -->
+  <section id="panel-notes" role="tabpanel" aria-labelledby="tab-notes">
+    <div class="notes">
+      <aside class="rail" aria-label="Topics">
+        <input type="search" id="notes-search" placeholder="Search notes (e.g. invalidate)" aria-label="Search the notes" autocomplete="off">
+        <p class="search-status" id="search-status" aria-live="polite"></p>
+        <select class="toc-jump" id="toc-jump" aria-label="Jump to a topic"></select>
+        <ol class="toc" id="toc"></ol>
+      </aside>
+      <div class="reading">
+        <section class="intro" id="notes-intro">
+          <p class="eyebrow">CS300 &middot; Midterm 1</p>
+          <h1>Mobile app development reviewer</h1>
+          <p>Java packages, design patterns, Android Views and graphics, Handler, nested classes, Holub, and the CS202 fundamentals, all drawn from the midterm outline, class discussions, and <em>Head First Design Patterns</em>. Answers confirmed in class are marked green. Where the record only kept a paraphrase, the notes say so.</p>
+          <ol class="study-steps" aria-label="How to study">
+            <li>Read a concept</li>
+            <li>Explain it aloud without looking</li>
+            <li>Trace its example</li>
+            <li>Answer the questions and flashcards</li>
+          </ol>
+          <p>For a compare-and-contrast answer, say what the two ideas share, the key difference, and one example.</p>
+        </section>
+        <div id="topics" style="display:grid;gap:22px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Flashcards -->
+  <section id="panel-cards" role="tabpanel" aria-labelledby="tab-cards" hidden>
+    <div class="cards-wrap">
+      <div class="toolbar">
+        <div class="group">
+          <label class="eyebrow" for="cards-topic">Set</label>
+          <select id="cards-topic"></select>
+        </div>
+        <div class="group">
+          <div class="segmented" id="cards-status" role="group" aria-label="Show cards">
+            <button type="button" data-status="all" aria-pressed="true">All</button>
+            <button type="button" data-status="learning" aria-pressed="false">Still learning</button>
+            <button type="button" data-status="unmarked" aria-pressed="false">Not marked</button>
+            <button type="button" data-status="known" aria-pressed="false">Known</button>
+          </div>
+          <button class="btn small" type="button" id="cards-shuffle" aria-pressed="false">Shuffle</button>
+        </div>
+      </div>
+      <div style="display:grid;gap:8px">
+        <div class="deck-strip" id="deck-strip" aria-label="All 60 cards. Pick one to jump to it."></div>
+        <div class="toolbar">
+          <div class="deck-legend" id="deck-legend"></div>
+          <button class="btn small" type="button" id="cards-reset">Clear marks</button>
+        </div>
+      </div>
+      <div id="card-area" style="display:grid;gap:16px"></div>
+      <p class="foot-note">Keys: <span class="kbd">Space</span> flip &middot; <span class="kbd">&larr;</span> <span class="kbd">&rarr;</span> move &middot; <span class="kbd">K</span> know it &middot; <span class="kbd">L</span> still learning</p>
+    </div>
+  </section>
+
+  <!-- Quiz -->
+  <section id="panel-quiz" role="tabpanel" aria-labelledby="tab-quiz" hidden>
+    <div class="quiz-wrap" id="quiz-area"></div>
+  </section>
+
+  <!-- Outline -->
+  <section id="panel-outline" role="tabpanel" aria-labelledby="tab-outline" hidden>
+    <div class="outline-wrap">
+      <div class="outline-summary">
+        <div class="row">
+          <h1>Midterm 1 outline</h1>
+          <span class="pool-count" id="outline-count"></span>
+        </div>
+        <div class="meter"><span id="outline-meter" style="width:0%"></span></div>
+        <p class="pool-count">All 17 study-guide items, grouped as in the midterm outline. Check an item off once you can explain it without notes.</p>
+      </div>
+      <ol class="outline-list" id="outline-list"></ol>
+      <div class="toolbar"><span></span><button class="btn small" type="button" id="outline-reset">Uncheck all</button></div>
+      <div class="tip-grid">
+        <div class="tip">
+          <h3>Describe the four named patterns</h3>
+          <p>Factory, Observer, Strategy, and Chain are named explicitly. For each, be ready to give the core idea, the book example, and one Android example.</p>
+        </div>
+        <div class="tip">
+          <h3>Know the analogies and their limits</h3>
+          <p>JFrame&asymp;Activity and JPanel&asymp;View are helpful, but an Activity has a system lifecycle. Say both the similarity and the difference.</p>
+        </div>
+        <div class="tip">
+          <h3>Trace code before you run it</h3>
+          <p>Predict what a loop, an equals check, or a swapped Strategy will do, then check yourself against the notes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>window.Prism = window.Prism || {}; window.Prism.manual = true;</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+<script src="js/data/notes.js"></script>
+<script src="js/data/flashcards.js"></script>
+<script src="js/data/questions.js"></script>
+<script src="js/app.js"></script>
+<!-- BODY:END -->
+</body>
+</html>
