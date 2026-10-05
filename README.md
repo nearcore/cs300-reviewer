@@ -2,6 +2,8 @@
 
 A study site for CS300 (Mobile App Development) Midterm 1: notes, flashcards, a practice quiz, and an outline checklist. It's plain HTML, CSS, and JavaScript with no build step.
 
+**Live site:** https://nearcore.github.io/cs300-reviewer/
+
 ## Study modes
 
 - **Notes**: all 13 topics, plus the recovered Q&A and references. Includes code examples and search.
