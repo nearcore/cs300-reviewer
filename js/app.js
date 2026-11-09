@@ -5,6 +5,8 @@
 
   var D = window.CS300;
   var TOPICS = D.topics;
+  var ALL = { sections: D.sections, flashcards: D.flashcards, questions: D.questions, outline: D.outline, terms: D.terms || [], drills: D.drills || [] };
+  ALL.questions.forEach(function (q) { if (D.examples && D.examples[q.id]) q.ex = D.examples[q.id]; });
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
   var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
 
@@ -24,6 +26,31 @@
   if (!quizStats.history) quizStats.history = [];
   if (!quizStats.missed) quizStats.missed = {};
 
+  /* ---------- exam scope: Midterm 1, Midterm 2, or both ---------- */
+  var exam = store.get("exam", "m2");
+  var EXAMS = {
+    m1: { name: "Midterm 1", title: "Mobile app development reviewer", outline: "Midterm 1 outline",
+      intro: "Java packages, design patterns, Android Views and graphics, Handler, nested classes, Holub, and the CS202 fundamentals. Answers confirmed in class are marked green. Where the record only kept a paraphrase, the notes say so.",
+      outlineNote: "All 17 study-guide items, grouped as in the midterm outline. Check an item off once you can explain it without notes." },
+    m2: { name: "Midterm 2", title: "Midterm 2 reviewer", outline: "Midterm 2 outline",
+      intro: "var, static, null pointers, try/catch, polymorphism, nested classes, lambdas, streams, method chaining, concurrent modification, seven design patterns, the activity lifecycle, Handler, and intersection math. Midterm 1 is fair game too, so switch to Both when you have time.",
+      outlineNote: "Every topic on the Midterm 2 study guide. Check an item off once you can explain it without notes." },
+    both: { name: "Both midterms", title: "Midterm 1 and 2 reviewer", outline: "Midterm 1 and 2 outline",
+      intro: "Everything from both study guides in one place. Midterm 2 can test any of the Midterm 1 material.",
+      outlineNote: "Every item from both study guides. Check an item off once you can explain it without notes." }
+  };
+  function examOf(topic) { return /^m\d/.test(topic) ? "m2" : "m1"; }
+  function inExam(topic) { return exam === "both" || examOf(topic) === exam; }
+  function applyExam() {
+    D.sections = ALL.sections.filter(function (s) { return inExam(s.id); });
+    D.flashcards = ALL.flashcards.filter(function (c) { return inExam(c.topic); });
+    D.questions = ALL.questions.filter(function (q) { return inExam(q.topic); });
+    D.outline = ALL.outline.filter(function (o) { return inExam(o.topics[0]); });
+    D.terms = ALL.terms.filter(function (t) { return exam === "both" || t.exam === "both" || t.exam === exam; });
+    D.drills = ALL.drills.filter(function (d) { return inExam(d.topic); });
+  }
+  applyExam();
+
   /* ---------- helpers ---------- */
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -38,6 +65,11 @@
       var t = a[i]; a[i] = a[j]; a[j] = t;
     }
     return a;
+  }
+  function exampleBlock(ex) {
+    if (!ex) return "";
+    return '<div class="q-example"><span class="eyebrow">Example</span>' +
+      (ex.charAt(0) === "~" ? "<p>" + fmt(ex.slice(1)) + "</p>" : codeBlock(ex)) + "</div>";
   }
   function highlight(root) {
     if (window.Prism && Prism.languages && Prism.languages.java) {
@@ -71,7 +103,8 @@
   }
 
   /* ---------- tabs ---------- */
-  var TABS = ["notes", "cards", "quiz", "outline"];
+  var TABS = ["notes", "terms", "cards", "quiz", "drills", "outline"];
+  if (D.walkthroughs) TABS.push("classcode", "labcode");
   var currentTab = "notes";
 
   function showTab(name, opts) {
@@ -99,6 +132,8 @@
     $("#chip-quiz b").textContent = last ? Math.round(100 * last.s / last.n) + "%" : "—";
     $("#tab-cards .count").textContent = D.flashcards.length;
     $("#tab-quiz .count").textContent = D.questions.length;
+    $("#tab-terms .count").textContent = D.terms.length;
+    $("#tab-drills .count").textContent = D.drills.length;
   }
 
   /* ---------- NOTES ---------- */
@@ -109,7 +144,12 @@
     };
   }
 
+  var notesObserver = null;
   function renderNotes() {
+    var E = EXAMS[exam];
+    $("#intro-eyebrow").textContent = "CS300 · " + E.name;
+    $("#intro-title").textContent = E.title;
+    $("#intro-text").textContent = E.intro;
     var toc = $("#toc");
     var jump = $("#toc-jump");
     var reading = $("#topics");
@@ -134,6 +174,23 @@
     }).join("");
     highlight(reading);
 
+    // Track which section is in view for the rail.
+    if (notesObserver) notesObserver.disconnect();
+    if ("IntersectionObserver" in window) {
+      notesObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) setActiveToc(en.target.dataset.id);
+        });
+      }, { rootMargin: "-130px 0px -65% 0px" });
+      $$(".topic", reading).forEach(function (el) { notesObserver.observe(el); });
+    }
+  }
+
+  function initNotes() {
+    var toc = $("#toc");
+    var jump = $("#toc-jump");
+    var reading = $("#topics");
+    renderNotes();
     toc.addEventListener("click", function (e) {
       var b = e.target.closest("[data-goto]");
       if (b) gotoSection(b.dataset.goto);
@@ -148,16 +205,6 @@
       var c = e.target.closest("[data-cards-topic]");
       if (c) { openCardsFor([c.dataset.cardsTopic], TOPICS[c.dataset.cardsTopic]); }
     });
-
-    // Track which section is in view for the rail.
-    if ("IntersectionObserver" in window) {
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (en) {
-          if (en.isIntersecting) setActiveToc(en.target.dataset.id);
-        });
-      }, { rootMargin: "-130px 0px -65% 0px" });
-      $$(".topic", reading).forEach(function (el) { io.observe(el); });
-    }
 
     var search = $("#notes-search");
     var t;
@@ -302,6 +349,7 @@
       "<span>" + counts.none + " not marked</span>";
 
     var currentId = deck.order[deck.idx];
+    $("#deck-strip").setAttribute("aria-label", "All " + D.flashcards.length + " cards. Pick one to jump to it.");
     $("#deck-strip").innerHTML = D.flashcards.map(function (c) {
       var m = cardMarks[c.id] || "";
       var inDeck = deck.order.indexOf(c.id) !== -1;
@@ -466,6 +514,9 @@
 
   /* ---------- QUIZ ---------- */
   var quizCfg = store.get("quizCfg", { src: "all", topic: "all", len: 10, missedOnly: false });
+  if (!quizCfg.kind) quizCfg.kind = "all";
+  var KINDS = { print: "What prints?", compile: "Does it compile?", bug: "Find the bug", pattern: "Which pattern?", concept: "Concepts" };
+  function kindOf(q) { return q.kind || "concept"; }
   var quizCustom = null; // {topics, label} when launched from notes/outline
   var quiz = null;       // active run
 
@@ -473,13 +524,14 @@
     var topics = quizCustom ? quizCustom.topics : (quizCfg.topic === "all" ? null : [quizCfg.topic]);
     return D.questions.filter(function (q) {
       if (quizCfg.src !== "all" && q.src !== quizCfg.src) return false;
+      if (quizCfg.kind !== "all" && kindOf(q) !== quizCfg.kind) return false;
       if (!inSet(topics, q.topic)) return false;
       if (quizCfg.missedOnly && !quizStats.missed[q.id]) return false;
       return true;
     });
   }
 
-  function missedCount() { return Object.keys(quizStats.missed).length; }
+  function missedCount() { return D.questions.filter(function (q) { return quizStats.missed[q.id]; }).length; }
 
   function renderQuizSetup() {
     var pool = quizPool();
@@ -503,9 +555,12 @@
     $("#quiz-area").innerHTML =
       '<section class="panel" aria-labelledby="quiz-setup-h">' +
         '<div style="display:grid;gap:6px"><h2 id="quiz-setup-h">Practice quiz</h2>' +
-        '<p class="pool-count">' + classN + " questions recovered from class quizzes and discussions, plus " + pracN + " practice questions written from the notes. Every question is labeled with its source.</p></div>" +
+        '<p class="pool-count">' + (classN ? classN + " questions recovered from class quizzes and discussions, plus " + pracN + " practice questions written from the notes." : pracN + " practice questions written from the study guide.") + " After each answer you get the reason and an example.</p></div>" +
         '<div class="field"><p class="eyebrow">Questions from</p><div class="segmented" id="q-src" role="group" aria-label="Question source">' +
           seg("all", "Everything", quizCfg.src) + seg("class", "From class only", quizCfg.src) + seg("practice", "Practice only", quizCfg.src) +
+        "</div></div>" +
+        '<div class="field"><p class="eyebrow">Question type</p><div class="segmented" id="q-kind" role="group" aria-label="Question type">' +
+          seg("all", "All types", quizCfg.kind) + Object.keys(KINDS).map(function (k) { return seg(k, KINDS[k], quizCfg.kind); }).join("") +
         "</div></div>" +
         '<div class="field"><label class="eyebrow" for="q-topic">Topic</label><select id="q-topic">' + topicOpts + "</select></div>" +
         '<div class="field"><p class="eyebrow">Length</p><div class="segmented" id="q-len" role="group" aria-label="Quiz length">' +
@@ -539,6 +594,7 @@
     else parts.push("All topics");
     if (quizCfg.src === "class") parts.push("from class");
     if (quizCfg.src === "practice") parts.push("practice");
+    if (quizCfg.kind !== "all") parts.push(KINDS[quizCfg.kind]);
     if (quizCfg.missedOnly) parts.push("missed");
     return parts.join(" · ");
   }
@@ -565,7 +621,7 @@
       '<span class="badge practice">Practice</span>';
     var srcNote = q.src === "class" ?
       (q.verbatim ? "Statement quoted from the class quiz; answer confirmed in class." : "Wording paraphrased; answer confirmed in class.") :
-      "Written from the notes for practice. Not from a class quiz.";
+      (q.kind === "print" || q.kind === "compile" ? "Practice question. Answer checked by running this code with Java." : "Written from the notes for practice. Not from a class quiz.");
 
     var opts = it.order.map(function (oi, k) {
       var cls = "opt";
@@ -582,7 +638,7 @@
     if (answered) {
       var ok = it.pick === 0;
       fb = '<div class="feedback ' + (ok ? "ok" : "no") + '" role="status"><span class="verdict">' +
-        (ok ? "Correct." : "Not quite. The answer is: " + fmt(q.options[0])) + "</span><p>" + fmt(q.why) + "</p></div>";
+        (ok ? "Correct." : "Not quite. The answer is: " + fmt(q.options[0])) + "</span><span class=\"eyebrow\">Why this is the answer</span><p>" + fmt(q.why) + "</p>" + exampleBlock(q.ex) + "</div>";
     }
 
     var last = quiz.i === quiz.items.length - 1;
@@ -591,7 +647,8 @@
         '<div class="q-progress"><span>Question ' + (quiz.i + 1) + " of " + quiz.items.length + "</span>" +
           '<button class="linkish" type="button" data-qa="quit">End quiz</button></div>' +
         '<div class="meter" aria-hidden="true"><span style="width:' + pct + '%;background:var(--accent)"></span></div>' +
-        '<div class="q-head">' + srcBadge + '<span class="badge topic">' + esc(TOPICS[q.topic]) + "</span></div>" +
+        '<div class="q-head">' + srcBadge + '<span class="badge topic">' + esc(TOPICS[q.topic]) + "</span>" +
+          (q.kind ? '<span class="badge topic">' + esc(KINDS[q.kind]) + "</span>" : "") + "</div>" +
         '<h2 class="q-text">' + fmt(q.q) + "</h2>" +
         (q.code ? codeBlock(q.code) : "") +
         '<div class="options" role="group" aria-label="Answer choices">' + opts + "</div>" +
@@ -634,7 +691,7 @@
       "<p>You ended the quiz before answering any questions.</p>";
     var list = missed.length ?
       '<h2 style="font-size:var(--step-1)">Review what you missed</h2><ul class="missed-list">' + missed.map(function (it) {
-        return '<li><span class="q">' + fmt(it.q.q) + '</span><span class="yours">Your answer: ' + fmt(it.q.options[it.pick]) + '</span><span class="right">Correct: ' + fmt(it.q.options[0]) + '</span><span class="why">' + fmt(it.q.why) + "</span></li>";
+        return '<li><span class="q">' + fmt(it.q.q) + '</span><span class="yours">Your answer: ' + fmt(it.q.options[it.pick]) + '</span><span class="right">Correct: ' + fmt(it.q.options[0]) + '</span><span class="why">' + fmt(it.q.why) + "</span>" + exampleBlock(it.q.ex) + "</li>";
       }).join("") + "</ul>" :
       (answered.length ? "<p>Every answer was right. Try a longer quiz or a different topic.</p>" : "");
     $("#quiz-area").innerHTML =
@@ -644,6 +701,7 @@
           '<button class="btn primary" type="button" data-qa="new">New quiz</button>' +
         "</div>" +
       "</section>";
+    highlight($("#quiz-area"));
     quiz.missedList = missed.map(function (it) { return it.q; });
     quiz.done = true;
   }
@@ -651,6 +709,7 @@
   function startQuizFor(topics, label) {
     quizCustom = { topics: topics, label: label };
     quizCfg.missedOnly = false;
+    quizCfg.kind = "all";
     showTab("quiz");
     var pool = shuffle(quizPool());
     if (quizCfg.len) pool = pool.slice(0, quizCfg.len);
@@ -666,6 +725,8 @@
       if (s) { quizCfg.src = s.dataset.v; saveCfg(); renderQuizSetup(); return; }
       var l = t.closest("#q-len [data-v]");
       if (l) { quizCfg.len = +l.dataset.v; saveCfg(); renderQuizSetup(); return; }
+      var kd = t.closest("#q-kind [data-v]");
+      if (kd) { quizCfg.kind = kd.dataset.v; saveCfg(); renderQuizSetup(); return; }
       if (t.closest("#q-start")) { startQuiz(); return; }
       var o = t.closest("[data-oi]");
       if (o && quiz) { pickAnswer(+o.dataset.oi); return; }
@@ -699,6 +760,8 @@
 
   /* ---------- OUTLINE ---------- */
   function renderOutline() {
+    $("#outline-title").textContent = EXAMS[exam].outline;
+    $("#outline-note").textContent = EXAMS[exam].outlineNote;
     var done = D.outline.filter(function (o) { return outlineDone[o.id]; }).length;
     var pct = Math.round(100 * done / D.outline.length);
     $("#outline-count").textContent = done + " of " + D.outline.length + " reviewed";
@@ -709,7 +772,7 @@
       var isDone = !!outlineDone[o.id];
       return '<li class="' + (isDone ? "done" : "") + '">' +
         '<input type="checkbox" id="ol-' + o.id + '" data-ol="' + o.id + '"' + (isDone ? " checked" : "") + ">" +
-        '<div style="min-width:0"><span class="item-num">Guide item ' + o.items + '</span><br><label class="item-title" for="ol-' + o.id + '">' + esc(o.title) + "</label>" +
+        '<div style="min-width:0"><span class="item-num">' + (o.id.charAt(0) === "m" ? "Midterm 2 · " : "Midterm 1 · ") + "item " + o.items + '</span><br><label class="item-title" for="ol-' + o.id + '">' + esc(o.title) + "</label>" +
           '<div class="where">' + o.topics.map(function (t) {
             return '<button type="button" class="topic-link" data-read="' + t + '">' + esc(TOPICS[t]) + "</button>";
           }).join("") + "</div></div>" +
@@ -756,6 +819,138 @@
     });
   }
 
+  /* ---------- TERMS ---------- */
+  function renderTerms() {
+    var q = $("#terms-search").value.trim().toLowerCase();
+    var list = D.terms.filter(function (t) { return !q || (t.term + " " + t.def + " " + t.ex).toLowerCase().indexOf(q) !== -1; });
+    $("#terms-count").textContent = plural(list.length, "term");
+    $("#terms-list").innerHTML = list.length ? list.map(function (t) {
+      return '<div class="term"><dt>' + esc(t.term) + "</dt><dd>" + fmt(t.def) + '<span class="term-ex">' + fmt(t.ex) + "</span></dd></div>";
+    }).join("") : '<div class="empty"><p>No terms match that search.</p></div>';
+  }
+  function initTerms() {
+    renderTerms();
+    $("#terms-search").addEventListener("input", renderTerms);
+  }
+
+  /* ---------- DRILLS ---------- */
+  var drillOpen = {};
+  function renderDrills() {
+    var area = $("#drills-list");
+    area.innerHTML = D.drills.map(function (d) {
+      var open = !!drillOpen[d.id];
+      return '<article class="panel drill"><div class="q-head"><span class="badge practice">Write it</span><span class="badge topic">' + esc(TOPICS[d.topic]) + "</span></div>" +
+        "<h2>" + esc(d.title) + "</h2><p>" + fmt(d.task) + "</p>" + codeBlock(d.start) +
+        '<label class="eyebrow" for="drill-' + d.id + '">Your answer</label>' +
+        '<textarea id="drill-' + d.id + '" rows="6" spellcheck="false" placeholder="Type it from memory, then compare."></textarea>' +
+        '<div><button class="btn" type="button" data-drill="' + d.id + '" aria-expanded="' + open + '">' + (open ? "Hide the answer" : "Show the answer") + "</button></div>" +
+        (open ? '<div class="feedback ok"><span class="eyebrow">Answer</span>' + codeBlock(d.answer) + '<span class="eyebrow">Why</span><p>' + fmt(d.why) + "</p></div>" : "") +
+        "</article>";
+    }).join("") || '<div class="empty"><p>No drills for this exam yet.</p></div>';
+    highlight(area);
+  }
+  function initDrills() {
+    renderDrills();
+    $("#drills-list").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-drill]");
+      if (!b) return;
+      var typed = {};
+      $$("#drills-list textarea").forEach(function (t) { typed[t.id] = t.value; });
+      drillOpen[b.dataset.drill] = !drillOpen[b.dataset.drill];
+      renderDrills();
+      Object.keys(typed).forEach(function (k) { var el = document.getElementById(k); if (el) el.value = typed[k]; });
+    });
+  }
+
+  /* ---------- CODE WALKTHROUGHS (private version only) ---------- */
+  var wtState = { classcode: 0, labcode: 0 };
+  function renderWalk(tab) {
+    var part = D.walkthroughs[tab];
+    var root = $("#" + tab + "-area");
+    var idx = wtState[tab];
+    var g = part.groups[idx];
+    var q = ($("#" + tab + "-search") ? $("#" + tab + "-search").value : "").trim().toLowerCase();
+    var groups = part.groups.map(function (gr, i) {
+      return '<li><button type="button" data-wt-group="' + i + '" class="' + (i === idx ? "active" : "") + '"><span class="n">' + (i + 1) + "</span><span>" + esc(gr.title) + "</span></button></li>";
+    }).join("");
+    var body = g.blocks.map(function (b) {
+      if (b.html !== undefined) return q ? "" : '<div class="wt-prose">' + b.html + "</div>";
+      var rows = b.rows.filter(function (r) {
+        return !q || (r.lines.map(function (l) { return l[1]; }).join(" ") + " " + r.what + " " + r.why + " " + r.tags.join(" ")).toLowerCase().indexOf(q) !== -1;
+      });
+      if (!rows.length) return "";
+      return '<section class="wt-file"><h3>' + esc(b.title) + "</h3>" + (b.note ? '<p class="wt-note">' + fmt(b.note) + "</p>" : "") +
+        rows.map(function (r) {
+          return '<div class="wt-row"><pre class="code"><code class="language-java">' + r.lines.map(function (l) {
+            return esc(l[1]);
+          }).join("\n") + '</code></pre><p class="wt-nums">Line' + (r.lines.length > 1 ? "s " + r.lines[0][0] + "–" + r.lines[r.lines.length - 1][0] : " " + r.lines[0][0]) + "</p>" +
+            '<div class="wt-text">' +
+              (r.tags.length ? '<div class="wt-tags">' + r.tags.map(function (t) { return '<span class="badge topic">' + esc(t) + "</span>"; }).join("") + "</div>" : "") +
+              (r.what ? '<p><b>What it does:</b> ' + fmt(r.what).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>") + "</p>" : "") +
+              (r.why ? '<p><b>Why it\u2019s written this way, here:</b> ' + fmt(r.why) + "</p>" : "") +
+              (r.syntax.length ? '<details class="wt-syntax"><summary>Syntax on this line (' + r.syntax.length + ")</summary><dl>" + r.syntax.map(function (s) {
+                return "<dt><code>" + esc(s[0]) + "</code></dt><dd>" + fmt(s[1]) + "</dd>";
+              }).join("") + "</dl></details>" : "") +
+            "</div></div>";
+        }).join("") + "</section>";
+    }).join("") || '<div class="empty"><p>Nothing in this section matches that search.</p></div>';
+    var keep = q;
+    root.innerHTML =
+      '<div class="notes"><aside class="rail" aria-label="Sections">' +
+        '<input type="search" id="' + tab + '-search" placeholder="Search this section (e.g. static)" aria-label="Search this section" autocomplete="off">' +
+        '<select class="toc-jump" data-wt-jump>' + part.groups.map(function (gr, i) { return '<option value="' + i + '"' + (i === idx ? " selected" : "") + ">" + (i + 1) + ". " + esc(gr.title) + "</option>"; }).join("") + "</select>" +
+        '<ol class="toc">' + groups + "</ol></aside>" +
+      '<div class="reading"><section class="intro"><p class="eyebrow">' + esc(part.label) + "</p><h1>" + esc(g.title) + "</h1><p>" + esc(part.blurb) + "</p></section>" + body + "</div></div>";
+    var s = $("#" + tab + "-search");
+    s.value = keep;
+    highlight(root);
+    return s;
+  }
+  function initWalk(tab) {
+    renderWalk(tab);
+    var root = $("#" + tab + "-area");
+    root.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-wt-group]");
+      if (!b) return;
+      wtState[tab] = +b.dataset.wtGroup;
+      $("#" + tab + "-search").value = "";
+      renderWalk(tab);
+      window.scrollTo(0, 0);
+    });
+    root.addEventListener("change", function (e) {
+      if (e.target.matches("[data-wt-jump]")) { wtState[tab] = +e.target.value; $("#" + tab + "-search").value = ""; renderWalk(tab); window.scrollTo(0, 0); }
+    });
+    var t;
+    root.addEventListener("input", function (e) {
+      if (e.target.id !== tab + "-search") return;
+      clearTimeout(t);
+      t = setTimeout(function () {
+        var s = renderWalk(tab);
+        s.focus();
+        s.setSelectionRange(s.value.length, s.value.length);
+      }, 200);
+    });
+  }
+
+  /* ---------- exam switch ---------- */
+  function setExam(next) {
+    exam = next;
+    store.set("exam", exam);
+    applyExam();
+    $$("#exam-switch button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.exam === exam)); });
+    $("#notes-search").value = "";
+    applySearch("");
+    renderNotes();
+    deck.topics = null; deck.label = ""; deck.status = "all";
+    renderCardTopicSelect(); rebuildDeck(); renderCards();
+    quiz = null; quizCustom = null; quizCfg.topic = "all"; quizCfg.missedOnly = false; saveCfg();
+    renderQuizSetup();
+    renderOutline();
+    renderTerms();
+    renderDrills();
+    updateChips();
+  }
+
   /* ---------- keyboard ---------- */
   document.addEventListener("keydown", function (e) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -785,11 +980,23 @@
 
   /* ---------- boot ---------- */
   function boot() {
-    renderNotes();
+    initNotes();
     initCards();
     initQuiz();
     initOutline();
+    initTerms();
+    initDrills();
+    if (D.walkthroughs) {
+      $$(".private-only").forEach(function (el) { el.hidden = false; });
+      initWalk("classcode");
+      initWalk("labcode");
+    }
     updateChips();
+    $$("#exam-switch button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.exam === exam)); });
+    $("#exam-switch").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-exam]");
+      if (b) setExam(b.dataset.exam);
+    });
 
     $("#tabs").addEventListener("click", function (e) {
       var b = e.target.closest("[data-tab]");
